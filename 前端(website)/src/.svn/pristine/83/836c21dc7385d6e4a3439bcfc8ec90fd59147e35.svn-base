@@ -1,0 +1,406 @@
+<template>
+<div>
+  <div class="layout-yh">
+
+    <div style="height:37px">
+      <Button v-if="disabled" type="primary" @click="disabled = !disabled">按标题查询</Button>
+      <Button style="float:right" v-if="!disabled" type="primary" @click="fanhui">返回</Button>
+      <Button v-if="!disabled" type="primary" @click="chaxun">查询</Button>
+    </div>
+    <Input class="kuang" v-if="!disabled" v-model="tiaojian" placeholder="请输要查询的标题"></Input>
+    <hr style="border: 1px solid grey;margin: 15px 0 15px 0;"></hr>
+
+    <Modal v-model="modale" title="隐患信息" width="1000" @on-ok="asyncOKe">
+      <p class="show">标题：{{eventRecord.title}}</p>
+      <p class="show">开始时间:{{eventDate}}</p>
+      <p class="show">隐患区域：{{area.name}}</p>
+      <p class="show"><span class="item-show">上报人:{{submitUser.name}}</span><span class="item-show">电话:{{submitUser.tel}}</span></p>
+      <p class="show"><span class="item-show">处理人:{{executeUser.name}}</span><span class="item-show">电话:{{executeUser.tel}}</span></p>
+      <p class="show">隐患描述：{{eventRecord.discribe}}</p>
+      <p class="show">处理结果:{{eventRecord.doResult}}</p>
+      <!-- <div v-for="item in picList" :value="item.src">{{item.src}}</div> -->
+      <div>
+        <img style="width:80%;margin-left: 10%" v-for="item in picList" :src="item.src">
+      </div>
+    </Modal>
+
+    <Modal v-model="replyBoard" width="600" title="回复面板" style="position: relative">
+      <div class="board-info">
+        <span v-for="item in replyList" class="item-message">
+       <div class="title-reply">
+         {{item.repUserName}} - {{item.repTime}}
+       </div>
+       <span class="content-reply">
+         {{item.repContext}}
+       </span>
+        </span>
+      </div>
+      <div slot="footer">
+      </div>
+    </Modal>
+
+    <div style="margin:10px 0 40px 0;position: relative;">
+      <Table border :columns="columns" :data="eventList" stripe></Table>
+      <div class="fenye">
+
+        <Page v-if="fenyedis1" size="small" :total="total" @on-change="changePage"></Page>
+      </div>
+    </div>
+  </div>
+</div>
+</template>
+
+<style>
+.board-info {
+  min-height: 500px;
+  max-height: 500px;
+  overflow-y: scroll;
+}
+
+.item-message {
+  padding: 10px;
+  display: block;
+  border-top: 1px dashed rgb(100, 150, 200);
+}
+
+.title-reply {
+  font-weight: bold;
+}
+
+.content-reply {
+  padding-left: 30px;
+}
+
+
+.layout-yh {
+  width: 92%;
+  height: auto;
+  margin: 10px 4% 10px 4%;
+}
+
+.kuang {
+  width: 150px;
+  display: inline-block;
+  margin: 10px 20px 0 0;
+}
+
+.fenye {
+  position: absolute;
+  right: 0;
+  bottom: -40px;
+  float: right;
+}
+
+.show {
+  margin: 5px;
+  width: 55%;
+  display: flex;
+}
+
+.item-show {
+  flex: 1
+}
+</style>
+
+
+<script>
+export default {
+  name: "evnetHistory",
+  created() {
+    this.jinru()
+  },
+  data() {
+    return {
+      area: {},
+      submitUser: {},
+      executeUser: {},
+      eventRecord: {},
+      picList: [],
+      replyBoard: false,
+      disabled: true,
+      page: 1,
+      total: 100,
+      fenyedis1: true,
+      tiaojian: '',
+      eventId: '',
+      eventDate: '',
+      modale: false,
+
+      columns: [{
+          title: '事件',
+          key: 'title'
+        },
+        {
+          title: '时间',
+          key: 'startTime',
+        }, {
+          title: '最新回复时间',
+          key: 'replyTime',
+        }, {
+          title: ' ',
+          render: (h, params) => {
+            return h('div', [
+              h('Button', {
+                props: {
+                  type: 'text',
+                  size: 'small'
+                },
+                style: {
+                  marginRight: '5px'
+                },
+                on: {
+                  click: () => {
+                    this.eventId = this.eventList[params.index].eveId;
+                    this.searchReply(params.index)
+                    this.replyBoard = true
+                  }
+                }
+              }, '回复记录'),
+            ]);
+          }
+        },
+        {
+          title: '是否处理',
+          key: 'process',
+
+        },
+        {
+          title: '操作',
+          key: 'action',
+          width: 150,
+          align: 'center',
+          render: (h, params) => {
+            return h('div', [
+              h('Button', {
+                props: {
+                  type: 'primary',
+                  size: 'small'
+                },
+                style: {
+                  marginRight: '5px'
+                },
+                on: {
+                  click: () => {
+                    this.show(params.index)
+                  }
+                }
+              }, '查看'),
+              h('Button', {
+                props: {
+                  type: 'error',
+                  size: 'small'
+                },
+                on: {
+                  click: () => {
+                    this.removeEvent(params.index)
+                  }
+                }
+              }, '删除')
+            ]);
+          }
+        }
+      ],
+      eventList: [{
+          title: '事件标题',
+          startTime: "2013.10.15",
+          process: 1
+        },
+        {
+          title: '事件标题',
+          startTime: "2013.10.15",
+          process: 1
+        },
+        {
+          title: '事件标题',
+          startTime: "2013.10.15",
+          process: 1
+        },
+        {
+          title: '事件标题',
+          startTime: "2013.10.15",
+          process: 1
+        },
+        {
+          title: '事件标题',
+          startTime: "2013.10.15",
+          process: 1
+        },
+        {
+          title: '事件标题',
+          startTime: "2013.10.15",
+          process: 1
+        },
+        {
+          title: '事件标题',
+          startTime: "2013.10.15",
+          process: 1
+        },
+      ],
+    }
+  },
+  methods: {
+    jinru(){
+      this.getAllEvent()
+    },
+    datestyle(time) {
+      let YYYY = 2000 + time.year % 100;
+      let MM = time.month + 1;
+      let dd = time.date;
+      let HH = time.hours;
+      let mm = time.minutes;
+      let ss = time.seconds;
+      return YYYY + "/" + MM + "/" + dd + " " + HH + ":" + mm + ":" + ss
+      console.log(YYYY)
+    },
+    transformData(set) {
+      for (var i = 0; i < set.length; i++) {
+        if (set[i].process == 0) {
+          set[i].process = '未查看'
+        } else if (set[i].process == 1) {
+          set[i].process = '已查看'
+        } else if (set[i].process == 2) {
+          set[i].process = '已处理'
+        }
+      }
+      return set
+    },
+    fanhui() {
+      this.disabled = !this.disabled;
+      this.fenyedis1 = true;
+      this.getAllEvent()
+    },
+    show(index) {
+      this.modale = true;
+      this.eventDate = this.eventList[index].startTime;
+      this.eventId = this.eventList[index].eveId;
+      this.$http.post(
+          'api/workOfEvent/getOneEvent', {
+            eveId: this.eventId
+          }, {
+            emulateJSON: true
+          }
+        )
+        .then(function(res) {
+          this.eventRecord = res.data.eventRecord
+          this.picList = res.data.picList
+          this.area = res.data.area
+          this.submitUser = res.data.submitUser
+          this.executeUser = res.data.executeUser
+        })
+        .catch(function(err) {
+          this.$Message.error('系统连接失败!' + err)
+        });
+    },
+
+    asyncOKe(index) {
+      this.modale = false
+
+    },
+
+    removeEvent(index) {
+      this.$Modal.confirm({
+        content: '<p>确认删除隐患？</p>',
+        onOk: () => {
+          this.$http.post(
+              'api/workOfEvent/removeEvent', {
+                eventId: this.eventList[index].eveId,
+              }, {
+                emulateJSON: true
+              }
+            )
+            .then(function(res) {
+              this.eventList.splice(index, 1);
+              if (res.data.state == true) {
+                this.$Message.success(res.data.message)
+                this.getAllEvent()
+              } else {
+                this.$Message.error(res.data.message)
+              }
+            })
+            .catch(function(err) {
+              this.$Message.error('系统连接失败!' + err)
+            });
+
+        }
+      });
+    },
+
+    searchReply() {
+      this.$http.post(
+          'api/workOfEvent/searchReply', {
+            eveId: this.eventId
+          }, {
+            emulateJSON: true
+          }
+        )
+        .then(function(res) {
+          this.replyList = res.data.replyList
+          for (var i = 0; i < res.data.replyList.length; i++) {
+            this.replyList[i].repTime = this.datestyle(this.replyList[i].repTime)
+          }
+        })
+        .catch(function(err) {
+          this.$Message.error('系统连接失败!' + err)
+        });
+    },
+
+    getAllEvent() {
+      this.$http.post(
+          'api/workOfEvent/getAllEvent', {
+            page: this.page,
+          }, {
+            emulateJSON: true
+          }
+        )
+        .then(function(res) {
+          this.eventList = this.transformData(res.data.eventList)
+          for (var i = 0; i < res.data.eventList.length; i++) {
+            this.eventList[i].startTime = this.datestyle(this.eventList[i].startTime)
+            this.eventList[i].replyTime = this.datestyle(this.eventList[i].replyTime)
+          }
+          this.total = res.data.total
+        })
+        .catch(function(err) {
+          this.$Message.error('系统连接失败!' + err)
+        });
+    },
+
+
+    chaxun() {
+
+      this.$http.post(
+          'api/workOfEvent/searchAll', {
+            condition: this.tiaojian
+          }, {
+            emulateJSON: true
+          }
+        )
+        .then(function(res) {
+          this.eventList = this.transformData(res.data.eventList)
+          for (var i = 0; i < res.data.eventList.length; i++) {
+            this.eventList[i].startTime = this.datestyle(this.eventList[i].startTime)
+            this.eventList[i].replyTime = this.datestyle(this.eventList[i].replyTime)
+          }
+          this.total = res.data.total
+          alert(res.data.total)
+          this.fenyedis1 = false
+
+        })
+        .catch(function(err) {
+          this.$Message.error('系统连接失败!' + err)
+        });
+
+    },
+
+    changePage(page) {
+      this.page = page;
+      this.getAllEvent()
+    },
+
+  },
+
+
+
+
+}
+</script>
