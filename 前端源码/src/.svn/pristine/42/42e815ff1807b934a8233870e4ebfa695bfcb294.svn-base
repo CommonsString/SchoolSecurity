@@ -1,0 +1,398 @@
+<template>
+  <div class='block-table' @click="tableClickSets">
+    <i-button type="primary" name="button"
+    v-if="!onEdit" class="button-edit"
+    @click='toEdit'>
+      编辑
+    </i-button>
+    <i-button name="button"
+    v-else class="button-edit"
+    style="background: rgb(126, 126, 126); color: white;
+    border:1px solid rgb(126, 126, 126)"
+    @click='exitEdit'>
+      退出编辑
+    </i-button>
+    <div class='title-block'>网格信息</div>
+    <!-- userInfo{{userInfo}} -->
+
+<!-- 网格树部分 -->
+    <div class="block">
+      <GridItem ref="gridItem" :grids='subs' :distance='1'
+      @currentArea='alterCurrentArea'/>
+    </div>
+
+<!-- 功能按钮部分 -->
+    <i-button name="button"
+    v-if="onEdit&&funChoosed" class="button-edit"
+    style="background: rgb(126, 126, 126); color: white;
+    border:1px solid rgb(126, 126, 126)"
+    @click='cancelEdit'>
+      取消
+    </i-button>
+    <i-button type="primary" name="button"
+    v-if="onEdit&&funChoosed" class="button-edit"
+    @click='submit'>
+      提交
+    </i-button>
+    <i-button type="primary" name="button"
+    v-if="onEdit&&!funChoosed" class="button-edit"
+    @click='removeArea'>
+    删除本区域
+    </i-button>
+    <i-button type="primary" name="button"
+    v-if="onEdit&&!funChoosed" class="button-edit"
+    @click='addSubArea'>
+      添加子区域
+    </i-button>
+    <i-button type="primary" name="button"
+    v-if="onEdit&&!funChoosed" class="button-edit"
+    @click='alterArea'>
+      编辑基本信息
+    </i-button>
+    <div class='title-block'>{{ operation }}：{{ gridTitle }}</div>
+    <!-- currentArea:{{ currentArea }}<br>
+    formDat:{{ formData }}<br> -->
+
+<!-- 表单部分 -->
+    <div class="block">
+      <div class="form-edit">
+        <i-form :label-width="60" class="form-left">
+          <Form-item label="区域号">
+              <i-input :readonly='gridDisabled' v-model="formData.number"></i-input>
+          </Form-item>
+          <Form-item label="区域名">
+              <i-input :readonly='gridDisabled' v-model="formData.name"></i-input>
+          </Form-item>
+          <Form-item label="区域描述">
+              <i-input v-if='!gridDisabled' type="textarea"
+              v-model="formData.discribe"></i-input>
+              <div class="div-textarea" v-else>{{ formData.discribe }}</div>
+          </Form-item>
+        </i-form>
+        <i-form :label-width="60" class="form-right">
+            <Form-item label="负责人">
+              <Selector :disabled="gridDisabled"
+               @changeItem="changeAdmin" ref="Selector"/>
+            </Form-item>
+            <Form-item label="电话">
+                <i-input readonly v-model="admin.tel"></i-input>
+            </Form-item>
+            <Form-item label="邮箱">
+                <i-input readonly v-model="admin.email"></i-input>
+            </Form-item>
+          </i-form>
+      </div>
+    </div>
+<!-- 区域管理办法部分 -->
+    <i-button type="primary" name="button"
+    class="button-edit" @click="getRule">
+      查看
+    </i-button>
+    <div class='title-block'>区域管理办法</div>
+      <Modal v-model="ruleModel" title="管理办法" width="1000">
+        <i-button type="ghost" name="button"
+        v-if="admin.uId==userInfo.uId && admin.uId!=undefined" @click="linkTo">
+          编辑
+        </i-button>
+        <div v-html="rule"></div>
+      </Modal>
+    <div class="block">
+    </div>
+  </div>
+</template>
+<script>
+import GridItem from '@/components/grid/GridItem'
+import Selector from '@/components/selector/Selector'
+export default {
+  name: 'grid',
+  mounted() {
+    this.loadTopArea()
+    // setInterval(this.hehe,1000)
+  },
+  components: {
+    GridItem,
+    Selector
+  },
+  methods: {
+    tableClickSets(){
+      this.$refs.Selector.show=false
+    },
+    toEdit(){
+      this.subs = ""//清除界面上的数据
+      this.onEdit=true
+      this.gridTitle='请选中网格'
+      this.operation='请选择编辑类型'
+      this.clearForm()
+      this.loadTopArea()//重置组件加载管理区域
+    },
+    clearForm(){
+      this.formData.number=''
+      this.formData.name=''
+      this.formData.discribe=''
+      this.formData.parentId=''
+      //////////////////////////////////////////////////////////
+      this.admin={}
+      // this.$refs.Selector.adminx=this.admin
+      this.$refs.Selector.item=this.admin
+    },
+    resetForm(){
+      this.formData.number=this.currentArea.number
+      this.formData.name=this.currentArea.name
+      this.formData.discribe=this.currentArea.discribe
+      this.admin=this.currentArea.admin
+      // this.$refs.Selector.adminx=this.admin
+      this.$refs.Selector.item=this.admin
+    },
+    exitEdit(){
+      this.onEdit=false
+      this.funChoosed = false
+      this.operation='详细信息'
+      this.gridDisabled=true
+      this.findUser()
+      this.loadTopArea()//重置组件加载根级区域
+    },
+    cancelEdit(){
+      this.funChoosed = false
+      this.gridDisabled=true
+      this.operation='详细信息'
+      // this.resetForm()
+      // console.log('this.admin.parId')
+      // console.log(this.admin.parId)
+      this.findUser()
+    },
+    alterArea(){
+      this.operation='基本信息编辑'
+      this.operationMethod='alterArea'
+      this.gridDisabled=false
+      this.funChoosed = true
+    },
+    addSubArea(){
+      this.operation='子区域添加'
+      this.operationMethod='addSubArea'
+      this.clearForm()
+      this.findUser()
+      this.formData.parAreaId=this.currentArea.areId
+      this.gridDisabled=false
+      this.funChoosed = true
+    },
+    removeArea(){
+      this.operation='删除区域'
+      this.operationMethod='removeArea'
+      if(confirm('确认删除?')){
+        this.submit()
+      }
+      else{
+        this.cancelEdit()
+      }
+    },
+    alterCurrentArea(grid){
+      this.currentArea=grid
+      this.resetForm()
+      if(this.operation!='子区域添加'){
+        this.admin=grid.admin
+      }
+      // console.log('this.amdin')
+      // console.log(this.admin)
+      this.formData.areId=grid.areId
+      this.gridTitle=grid.name
+      this.$refs.Selector.item=this.admin
+
+      // this.findSubUser(this.admin.parId)
+      this.findUser()
+    },
+    changeAdmin(admin){
+      this.admin=admin
+      this.formData.uId=admin.uId
+    },
+    submit(){
+      if(this.gridTitle=='请选中网格'){
+        this.$Message.error('未选中网格')
+        return
+      }
+      this.$http.post(
+        'api/infoSearchAndFix/'+this.operationMethod,
+        this.formData,
+        {emulateJSON: true}
+      )
+      .then(function(res){
+        if(res.data.state==true){
+          this.$Message.success(res.data.message)
+          this.cancelEdit()
+        }
+        else{
+          this.$Message.error(res.data.message)
+        }
+      })
+      .catch(function(err){
+        this.$Message.error('系统连接失败!'+err)
+      })
+    },
+    loadTopArea(){
+      //若处于产看状态请求加载根级区域，若处于编辑状态请求加载管理区域
+      let method = !this.onEdit?'loadTopArea':'loadManageArea'
+      this.$http.post(
+        'api/infoSearchAndFix/'+method,
+        {
+          uId: this.userInfo.uId
+        },
+        {emulateJSON: true}
+      )
+      .then(function(res){
+        this.$refs.gridItem.subs=""
+        this.subs=res.data.areaList
+        // console.log(res.data.areaList)
+      })
+      .catch(function(res){
+        this.$Message.error('系统连接失败!'+err)
+      })
+    },
+    findUser(){
+      //当当前方法为子区域添加时，传当前区域id查找下级区域
+      if(this.operation=='子区域添加'){
+        this.findSubUser(this.currentArea.areId)
+      }
+      else{
+        this.findSubUser(this.currentArea.parAreaId)
+      }
+    },
+    findSubUser(areId){
+      // console.log('this.currentArea.parAreaId')
+      // console.log(this.currentArea.parAreaId)
+      this.$http.post(
+        'api/infoSearchAndFix/findSubUser',
+        {
+          // uId: adminId,
+          // parAreaId: this.currentArea.parAreaId
+          areId: areId
+        },
+        {emulateJSON: true}
+      )
+      .then(function(res){
+        console.log('res.data.subUserList')
+        console.log(res.data.subUserList)
+        this.$refs.Selector.itemList=res.data.subUserList
+      })
+      .catch(function(err){
+        this.$Message.error('系统连接失败!'+err)
+      })
+    },
+    // findSubUserForAdd(adminId){
+    //   // console.log('this.currentArea.parAreaId')
+    //   // console.log(this.currentArea.parAreaId)
+    //   this.$http.post(
+    //     'api/infoSearchAndFix/findSubUser',
+    //     {
+    //       uId: adminId,
+    //       areId: this.currentArea.areId
+    //     },
+    //     {emulateJSON: true}
+    //   )
+    //   .then(function(res){
+    //     this.$refs.Selector.itemList=res.data.subUserList
+    //   })
+    //   .catch(function(err){
+    //     this.$Message.error('系统连接失败!'+err)
+    //   })
+    // },
+    getRule(){
+      this.ruleModel=!this.ruleModel
+      this.$http.post(
+        'api/infoSearchAndFix/getRule',
+        {areId: this.currentArea.areId},
+        {emulateJSON: true}
+      )
+      .then(function(res){
+        this.rule = res.data.rule.content
+      })
+      .catch(function(err){
+        this.$Message.error('系统连接失败!')
+      })
+
+    },
+    linkTo(){
+      let href = "http://118.89.53.234:8099/SafeCDTU/editRule.jsp?FSEdfsfKfsefseFGfsfNESGfsefNfseFEJS="+this.userInfo.uId
+                +"&FSEdawdaKdwadFHNSdawdEUdawHF="+this.currentArea.areId
+      let top = (window.screen.availHeight-600)/2
+      let left = (window.screen.availWidth-1000)/2
+      let location = ', top='+top+', left='+left
+      window.open(href,'编辑窗口','width=1000, height=600'+location)
+    }
+  },
+  props: ['userInfo'],
+  data (){
+    return {
+      gridDisabled:true,
+      onEdit: false,
+      funChoosed: false,
+
+      operation: '详细信息',//编辑区域的当前操作类型
+      operationMethod: '',//对应的后端方法名
+      gridTitle: '',
+      currentArea: {},
+      admin: {},
+      formData: {
+        areId: '',//不在数据表中
+        number: '',//区域号
+        uId: '',//负责用户的id
+        name: '',//区域名
+        discribe: '',//区域描述
+        parentId: '0'
+      },
+      subs: [],
+
+      ruleModel: false,
+      rule: `<h1 style="text-align:center">标题</h1>
+      <h1 style="text-align:center">标题</h1>
+      <h1 style="text-align:center">标题</h1>
+      <h1 style="text-align:center">标题</h1>
+      <h1 style="text-align:center">标题</h1>
+      <h1 style="text-align:center">标题</h1>
+      <h1 style="text-align:center">标题</h1>
+      <h1 style="text-align:center">标题</h1>
+      <h1 style="text-align:center">标题</h1>`
+    }
+  }
+}
+</script>
+<style lang="css" scoped>
+.title-block{
+  padding: 10px 0px;
+  border-bottom: 1px dotted rgb(218, 218, 218);
+}
+.block{
+  padding: 10px 30px;
+}
+.button-edit{
+  float: right;
+  margin-left: 10px;
+}
+.form-edit{
+  padding: 20px 0px;
+}
+.item-input{
+  width: 49%;
+  float: left;
+}
+.input-textarea{
+  color: red;
+}
+.div-textarea{
+  border: 1px solid rgb(212, 212, 212);
+  line-height: 18px;
+  border-radius: 3px;
+  padding: 5px 4px;
+  min-height: 32px;
+}
+.form-edit{
+  height: 200px;
+}
+.form-left{
+  width: 50%;
+  float: left;
+}
+.form-right{
+  width: 40%;
+  float: right;
+  /*padding-bottom: 30px;*/
+}
+</style>

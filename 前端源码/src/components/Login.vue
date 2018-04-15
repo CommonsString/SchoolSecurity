@@ -1,0 +1,247 @@
+
+<template>
+  <div class="block">
+    <div class="block-left">
+      <div class="block-school">
+        <img class="login-logo" src="../assets/CDTUlogo.png">
+        <div class="login-title login-title-CDTU">成都工业学院</div>
+      </div>
+      <div class="login-title login-title-SYS">安全与稳定网格化管理系统</div>
+    </div>
+    <div class="block-right">
+      <Card style="width:300px;margin:0 auto;">
+          <p slot="title" style="text-align: center">
+            <span v-if="flag.onLogin">登录系统</span>
+            <span v-else>账号注册</span>
+          </p>
+          <Form ref="formData" :model="formData" :rules="fromRule">
+              <Form-item prop="username">
+                  <Input type="text" v-model="formData.username" placeholder="请填写账号">
+                  <Icon type="person" slot="prepend"></Icon>
+                  </Input>
+              </Form-item>
+              <Form-item prop="password">
+                  <Input type="password" v-model="formData.password" placeholder="请填写密码">
+                  <Icon type="locked" slot="prepend"></Icon>
+                  </Input>
+              </Form-item>
+              <Form-item v-show="inputCode" prop="veCode">
+                  <img @click='reqVeCode' class='vecodeimg' alt=""/>
+                  <Button type="default" @click.native="toInputCode" style="float: right;">点击获取验证码</Button>
+                  <Input type="text" v-model="formData.veCode" placeholder="请填写验证码">
+                  <Icon type="wrench" slot="prepend"></Icon>
+                  </Input>
+              </Form-item>
+              <Form-item>
+              <Checkbox v-model='formData.keepLogon' style="float:left;">七天内自动登录</Checkbox>
+              <a v-if="flag.onLogin" @click='flag.resetPassword=!flag.resetPassword' style="float:right" >忘记密码</a>
+              <span @click='functionSwitch'>
+                <a v-if="flag.onLogin&flag.regOpen" style="float:right" >帐号注册</a>
+                <a v-else-if="flag.regOpen" style="float:right" >返回登录</a>
+              </span>
+              </Form-item>
+              <Form-item>
+              <Form-item>
+                <div v-if="formData.keepLogon">登陆后点击顶部退出即可清除账号信息</div>
+                <div v-if="flag.resetPassword">忘记密码请联系...</div>
+              </Form-item>
+                  <Button type="primary" @click.native="tologin" long>
+                    <span v-if="flag.onLogin">登录</span>
+                    <span v-else>注册</span>
+                  </Button>
+              </Form-item>
+          </Form>
+      </Card>
+    </div>
+  </div>
+
+</template>
+
+<script>
+import ROUTE from '@/assets/ROUTE'
+export default {
+  name: 'Login',
+    created() {
+        let cookie = this.getCookie('userInfo')
+       //  当cookie信息正确时，onDologin才会通过
+        this.userInfo = JSON.parse(cookie)
+        this.$emit('onDoLogin',this.userInfo)
+    },
+    data() {
+        return {
+            inputCode: true,
+            userInfo: {},
+            veCodeString: '?u?ndefined?',
+            flag: {
+              onLogin: true,//控制面板为登录还是注册
+              resetPassword: false,//忘记密码提示控制变量
+              regOpen: true
+            },
+            formData: {
+                username: '',
+                password: '',
+                veCode: '',
+                keepLogon:false
+            },
+            fromRule: {
+                username: {
+                    required: true,
+                    message: '请填写账号',
+                    trigger: 'blur'
+                },
+                password: [{
+                        required: true,
+                        message: '请填写密码',
+                        trigger: 'blur'
+                    },
+                    {
+                        type: 'string',
+                        min: 6,
+                        message: '密码长度不能小于6位',
+                        trigger: 'blur'
+                    }
+                ],
+                veCode: {
+                    required: true,
+                    message: '请填写验证码',
+                    trigger: 'blur'
+                }
+            }
+        }
+    },
+    methods: {
+      functionSwitch(){
+        this.flag.onLogin=!this.flag.onLogin
+        if(!this.flag.onLogin){
+          this.inputCode = false
+        }
+        else{
+          this.inputCode = true
+        }
+      },
+      getCookie(key){
+        var arr = document.cookie.split('; ');
+        for(var i = 0; i < arr.length; i++){
+          var temp = arr[i].split('=');
+          if(temp[0] == key){
+            return temp[1];
+          }
+        }
+        return {};
+      },
+      toInputCode() {
+        if(this.formData.username==""){
+          alert('请输入账号')
+          return
+        }
+        if(this.flag.onLogin){
+          this.inputCode = true
+          this.reqVeCode()
+        }
+      },
+      reqVeCode(){
+      // alert()
+        document.getElementsByClassName('vecodeimg')[0].src=''
+        var VeCodeSrc = ROUTE.toReplace+'/VerifyCode?username='
+        //  var VeCodeSrc = 'http:/\/???:???/SafeCDTU/VerifyCode?username='
+         + this.formData.username + '&i=' + new Date()
+        document.getElementsByClassName('vecodeimg')[0].src=VeCodeSrc
+      },
+      tologin (){
+        let method = this.flag.onLogin?'login':'regist'
+        this.$http.post(
+          ROUTE.toReplace+'/methods/'+method,
+          //  'http:/\/???:???/SafeCDTU/methods/'+method,
+          this.formData,
+          {emulateJSON: true}
+        )
+        .then(function(res){
+          // alert(res.data.state)
+          if(res.data.state==true){
+            this.userInfo = res.data.user
+            this.$Message.success(res.data.message)
+            this.cookieStorage()
+            this.$emit('onDoLogin',this.userInfo)
+            location.replace('/')
+          }
+          else{
+            this.$Message.error(res.data.message)
+          }
+        })
+        .catch(function(err){
+          this.$Message.error('系统连接失败')
+          // if(confirm('是否自动登录？')){
+          //   this.userInfo.name="tomm"
+          //   this.userInfo.tel="123"
+          //   this.userInfo.email="@.com"
+          //   this.userInfo.depId="1"
+
+          //   this.userInfo.level=2
+          //   this.userInfo.uId='4'
+          //   this.cookieStorage()
+          //   this.$emit('onDoLogin',this.userInfo)
+          //   this.$router.push('/')
+          // }
+        })
+      },
+      cookieStorage(){
+        if(this.formData.keepLogon){
+          //  如果用户选择了七天内自动登录，则将cookie存储七天
+          var exp = new Date();
+          exp.setTime(exp.getTime() + 7*24*60*60*1000)
+          document.cookie = 'userInfo' + '=' + JSON.stringify(this.userInfo)
+          + ";expires=" + exp.toGMTString()
+        }
+        else{
+          //否则存一个临时cookie，浏览器关闭后自动销毁
+          document.cookie = 'userInfo' + '=' + JSON.stringify(this.userInfo)
+        }
+      }
+    },
+}
+</script>
+
+<style scoped>
+.block{
+  position: absolute;
+  width: 100%;
+  background: rgba(10,10,10,0.1);
+}
+.block-left{
+  top: 0px;
+  margin-left: 30px;
+  margin-right: 30px;
+  margin-top: 10px;
+  height: 200px;
+  width: 490px;
+}
+.block-left *{
+  float: left;
+}
+.login-title-CDTU{
+}
+.login-logo{
+  width:120px;
+}
+.login-title-CDTU{
+  margin: 0px 30px;
+  height: 120px;
+  line-height: 140px;
+  color: rgb(239, 239, 239);
+  font-size: 50px;
+}
+.login-title-SYS{
+  margin: 0px 20px;
+  font-size:36px;
+  color: rgb(243, 243, 243)
+}
+.block-right{
+  position: absolute;
+  top: 260px;
+  right: 20%;
+  width: 300px;
+}
+a{
+  margin-left: 6px;
+}
+</style>

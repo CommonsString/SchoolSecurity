@@ -1,0 +1,85 @@
+<template>
+  <div class="">
+      <i-button v-for="(grid,index) in grids" :key="index" class="botton"
+      @click='clickEventSets(grid)'
+      :class="{active:grid.number==mark}">
+        <div class="">
+          {{ grid.name }}
+        </div>
+      </i-button>
+      <!-- {{grids}} -->
+      <div class="block-grids">
+        <GridItem v-if="subs!=''&distance>0"
+          :grids='subs' :distance='distance-1'
+          @currentArea='currentArea'/>
+      </div>
+  </div>
+</template>
+<script>
+import GridItem from '@/components/grid/GridItem'
+export default {
+  name: 'GridItem',
+  props: ['grids','distance'],
+  components: {
+    GridItem
+  },
+  methods: {
+    clickEventSets(grid){
+      this.mark=grid.number
+      this.distance=1
+      this.loadSubArea(grid)
+    },
+    currentArea(grid){
+      this.$emit('currentArea',grid)
+    },
+    loadSubArea(grid){
+      // this.subs = [
+      //   {
+      //     name: '计算机工程'
+      //   },
+      //   {
+      //     name: '电子'
+      //   },
+      //   {
+      //     name: '通信'
+      //   }
+      // ]
+      // this.$emit('currentArea',grid)
+      this.$http.post(
+        'http:/\/localhost:8099/SafeCDTU/infoSearchAndFix/loadSubArea',
+        {
+          areId: grid.areId,
+          uId: grid.uId
+        },
+        {emulateJSON: true}
+      )
+      .then(function(res){
+        this.subs=res.data.subAreaList
+        console.log('res.data.user')
+        console.log(res.data.user)
+        grid.admin=res.data.user
+        this.$emit('currentArea',grid)
+      })
+      .catch(function(err){
+        this.$Message.error('系统连接失败!'+err)
+      })
+    }
+  },
+
+  data (){
+    return {
+      subs: '',
+      mark: '',
+      cnt: 0
+    }
+  }
+}
+</script>
+<style lang="css" scoped>
+.block-grids{
+  padding: 20px 0px 0px 0px;
+}
+.botton{
+  margin: 5px 2px;
+}
+</style>
